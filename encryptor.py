@@ -1,4 +1,5 @@
 import os
+import sys
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
@@ -9,6 +10,7 @@ import base64
 class CryptoManager:
     _instance = None
     _initialized = False
+    MAGIC_MARKER = b'ENCRYPTED'  # Маркер зашифрованного файла
 
     def __new__(cls):
         if cls._instance is None:
@@ -18,7 +20,9 @@ class CryptoManager:
     def __init__(self):
         if not CryptoManager._initialized:
             CryptoManager._initialized = True
-# Функция создания пароля. Используется совместно с salt (солью). 
+            self.script_path = os.path.abspath(sys.argv[0])
+
+    # Функция создания пароля. Используется совместно с salt (солью). 
     def _get_key(self, password: str, salt: bytes) -> bytes:
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
@@ -28,9 +32,31 @@ class CryptoManager:
             backend=default_backend()
         )
         return base64.urlsafe_b64encode(kdf.derive(password.encode()))
-# Функция шифрования файла, также стараемся учитывать принцип единой ответственности
+
+    # Проверка, является ли файл самим скриптом
+    def _is_script(self, filepath: str) -> bool:
+        return os.path.abspath(filepath) == self.script_path
+
+    # Проверка, зашифрован ли уже файл
+    def _is_encrypted(self, filepath: str) -> bool:
+        try:
+            with open(filepath, 'rb') as f:
+                header = f.read(len(self.MAGIC_MARKER))
+                return header == self.MAGIC_MARKER
+        except:
+            return False
+
+    # Функция шифрования файла, также стараемся учитывать принцип единой ответственности
     def encrypt_file(self, filepath: str, password: str): 
         try:
+            if self._is_script(filepath):
+                print(f"Пропущен (скрипт): {filepath}")
+                return None
+            
+            if self._is_encrypted(filepath):
+                print(f"Пропущен (уже зашифрован): {filepath}")
+                return None
+            
             salt = os.urandom(16)
             key = self._get_key(password, salt)
             
@@ -40,20 +66,30 @@ class CryptoManager:
             encrypted = Fernet(key).encrypt(data)
             
             with open(filepath, 'wb') as f:
-                f.write(salt + encrypted)
+                f.write(self.MAGIC_MARKER + salt + encrypted)
             
             return True
         except Exception as e:
             print(f"Ошибка: {filepath} - {e}")
             return False
-# Функция расшифровки
+
+    # Функция расшифровки
     def decrypt_file(self, filepath: str, password: str):
         try:
+            if self._is_script(filepath):
+                print(f"Пропущен (скрипт): {filepath}")
+                return None
+            
             with open(filepath, 'rb') as f:
                 data = f.read()
             
-            salt = data[:16]
-            encrypted = data[16:]
+            marker_len = len(self.MAGIC_MARKER)
+            if data[:marker_len] != self.MAGIC_MARKER:
+                print(f"Пропущен (не зашифрован): {filepath}")
+                return None
+            
+            salt = data[marker_len:marker_len+16]
+            encrypted = data[marker_len+16:]
             key = self._get_key(password, salt)
             
             decrypted = Fernet(key).decrypt(encrypted)
@@ -65,44 +101,42 @@ class CryptoManager:
         except Exception as e:
             print(f"Ошибка: {filepath} - {e}")
             return False
-# Функция для работы скрипта внутри папки
+
+    # Функция для работы скрипта внутри папки
     def process_folder(self, folder: str, password: str, encrypt=True):
         action = "Шифрование" if encrypt else "Дешифрование"
-        print(f"\n{action}: {folder}")
+        print(f"\n{action}: {folder}\n")
         
         success = 0
         failed = 0
+        skipped = 0
         
         for root, _, files in os.walk(folder):
             for file in files:
-                if file.endswith('.py'):  # Пропускаем Python-файлы
-                    continue
-                
                 filepath = os.path.join(root, file)
-                print(f"  {filepath}")
                 
                 if encrypt:
                     result = self.encrypt_file(filepath, password)
                 else:
                     result = self.decrypt_file(filepath, password)
                 
-                if result:
+                if result is True:
                     success += 1
-                else:
+                elif result is False:
                     failed += 1
+                else:
+                    skipped += 1
         
-        print(f"\nГотово: {success} успешно, {failed} ошибок")
+        print(f"\nГотово: {success} успешно, {failed} ошибок, {skipped} пропущено")
 
 
 def main():
     crypto = CryptoManager()
     
-    print("=" * 50)
-    print("ШИФРОВАНИЕ ФАЙЛОВ")
-    print("=" * 50)
+    print("ШИФРОВАНИЕ ФАЙЛОВ\n")
     
     while True:
-        print("\n1. Зашифровать папку")
+        print("1. Зашифровать папку")
         print("2. Расшифровать папку")
         print("3. Выход")
         
@@ -122,7 +156,7 @@ def main():
             continue
         
         password = input("Пароль: ").strip()
-        if len(password) < 4:
+        if len(password) < 12:
             print("Пароль слишком короткий!")
             continue
         
