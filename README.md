@@ -58,17 +58,18 @@ pythonclass CryptoManager:
 Избежание проблем с порядком инициализации модулей
 
 Как работает:
-python# При импорте модуля
+
+/// При импорте модуля
 from file_encryptor import CryptoManager
-# _instance = None (объект еще не создан)
+ _instance = None (объект еще не создан)
 
-# При первом вызове
+/// При первом вызове
 crypto = CryptoManager()  # Создается объект
-# _instance теперь содержит объект
+/// _instance теперь содержит объект
 
-# При повторных вызовах
+/// При повторных вызовах
 crypto2 = CryptoManager()  # Возвращается тот же объект
-# crypto is crypto2 → True
+/// crypto is crypto2 → True
 Зачем _initialized:
 Python вызывает __init__ каждый раз при создании объекта, даже если объект уже существует. Флаг _initialized гарантирует, что код инициализации выполнится только один раз.
 
