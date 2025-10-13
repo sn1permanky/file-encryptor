@@ -99,12 +99,12 @@ class CryptoManager:
             
             return True
         except Exception as e:
-            print(f"Ошибка: {filepath} - {e}")
+            print(f"Error: {filepath} - {e}")
             return False
 
     # Функция для работы скрипта внутри папки
     def process_folder(self, folder: str, password: str, encrypt=True):
-        action = "Шифрование" if encrypt else "Дешифрование"
+        action = "Encrypt" if encrypt else "Decrypt"
         print(f"\n{action}: {folder}\n")
         
         success = 0
@@ -127,37 +127,37 @@ class CryptoManager:
                 else:
                     skipped += 1
         
-        print(f"\nГотово: {success} успешно, {failed} ошибок, {skipped} пропущено")
+        print(f"\nГотово: {success} success, {failed} mistakes, {skipped} skipped")
 
 
 def main():
     crypto = CryptoManager()
     
-    print("ШИФРОВАНИЕ ФАЙЛОВ\n")
+    print("ENCRYPT FILES\n")
     
     while True:
-        print("1. Зашифровать папку")
-        print("2. Расшифровать папку")
-        print("3. Выход")
+        print("1. Encrypt directory")
+        print("2. Decrypt directory")
+        print("3. Exit")
         
-        choice = input("\nВыбор (1-3): ").strip()
+        choice = input("\nChoice (1-3): ").strip()
         
         if choice == '3':
-            print("Выход...")
+            print("Exit...")
             break
         
         if choice not in ['1', '2']:
-            print("Неверный выбор!")
+            print("Wrond desicion!")
             continue
         
-        folder = input("Путь к папке: ").strip()
+        folder = input("path: ").strip()
         if not os.path.isdir(folder):
-            print("Папка не найдена!")
+            print("Dir is not found!")
             continue
         
-        password = input("Пароль: ").strip()
+        password = input("Password: ").strip()
         if len(password) < 12:
-            print("Пароль слишком короткий!")
+            print("Password is too short!")
             continue
         
         encrypt = (choice == '1')
